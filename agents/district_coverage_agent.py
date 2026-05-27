@@ -443,7 +443,14 @@ Then call the appropriate data tool. After observing the result, reason again if
 
 ## Guidelines
 - Use `run_pandas` only for queries no other tool can handle.
-- Be concise and specific. Format numbers clearly."""
+- Be concise and specific. Format numbers clearly.
+
+## Formatting (Slack mrkdwn)
+- Use *bold* for headers and key labels (NOT **double asterisk**)
+- Use - for bullet lists
+- Use `backticks` for codes or numbers to highlight
+- Never use markdown tables — use bullet lists instead
+- Never use ## headers — use *bold* labels instead"""
 
 # Convert Anthropic-style tool schemas → OpenAI function format
 _OAI_TOOLS = [
