@@ -42,7 +42,18 @@ def _set_history(channel: str, history: list) -> None:
         _histories[channel] = history
 
 
-def _process(text: str, channel: str, thread_ts: str, client) -> None:
+# Keywords that signal the user wants the answer posted in the main channel
+_CHANNEL_POST_PHRASES = re.compile(
+    r"\b(post in channel|share in channel|reply in channel|post here|share here|reply here|share with (the )?team|post (it |this )?(to |in )?(the )?channel)\b",
+    re.IGNORECASE,
+)
+
+
+def _wants_channel_post(text: str) -> bool:
+    return bool(_CHANNEL_POST_PHRASES.search(text))
+
+
+def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel: bool, client) -> None:
     """Run the agent in a background thread and post the result back."""
     try:
         history = _get_history(channel)
@@ -51,12 +62,20 @@ def _process(text: str, channel: str, thread_ts: str, client) -> None:
     except Exception as exc:
         answer = f"Sorry, something went wrong: {exc}"
 
-    client.chat_postMessage(
-        channel=channel,
-        thread_ts=thread_ts,
-        text=answer,
-    )
-    # Remove the thinking emoji once done
+    if post_to_channel:
+        # Post in the main channel, tagging the user who asked
+        client.chat_postMessage(
+            channel=channel,
+            text=f"<@{user}> {answer}",
+        )
+    else:
+        # Default: reply in thread
+        client.chat_postMessage(
+            channel=channel,
+            thread_ts=thread_ts,
+            text=answer,
+        )
+
     try:
         client.reactions_remove(channel=channel, timestamp=thread_ts, name="thinking_face")
     except Exception:
@@ -72,10 +91,10 @@ def _handle(event: dict, client) -> None:
         return
 
     channel = event["channel"]
-    # Reply in thread if already in one, otherwise start a new thread
+    user = event.get("user", "")
     thread_ts = event.get("thread_ts") or event["ts"]
+    post_to_channel = _wants_channel_post(text)
 
-    # Acknowledge immediately with a thinking reaction
     try:
         client.reactions_add(channel=channel, timestamp=event["ts"], name="thinking_face")
     except Exception:
@@ -83,7 +102,7 @@ def _handle(event: dict, client) -> None:
 
     threading.Thread(
         target=_process,
-        args=(text, channel, thread_ts, client),
+        args=(text, user, channel, thread_ts, post_to_channel, client),
         daemon=True,
     ).start()
 
