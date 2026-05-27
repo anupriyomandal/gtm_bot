@@ -449,7 +449,7 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use *bold* for headers and key labels (NOT **double asterisk**)
 - Use - for bullet lists
 - Use `backticks` for codes or numbers to highlight
-- Never use markdown tables — use bullet lists instead
+- Never use markdown tables — wrap tables in triple backticks (code block) so columns align in monospace
 - Never use ## headers — use *bold* labels instead"""
 
 # Convert Anthropic-style tool schemas → OpenAI function format
