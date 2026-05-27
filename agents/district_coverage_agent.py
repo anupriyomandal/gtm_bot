@@ -171,6 +171,7 @@ def aggregate_by_zone_or_region(group_by: str = "zone") -> dict:
         districts_with_feeder_plan=("Feeder Appointment Plan", "sum"),
         total_DSEs_current=("Current No of DSEs", "sum"),
         total_DSEs_addition_planned=("No of DSEs Addition Plan (1,2,3 etc)", "sum"),
+        total_DTs_addition_planned=("No of DTs Appointment Plan (1,2,3 etc)", "sum"),
     ).round(1).reset_index()
 
     dt_yes = df[df["DT Appointment Plan (Y/N)"] == "Y"]
@@ -332,7 +333,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "aggregate_by_zone_or_region",
-        "description": "Aggregate key metrics grouped by zone or region: total_districts, total_DTs, total_SDs_FY26, total_planned_SDs_FY27, total_feeders, total_DSEs_current, total_DSEs_addition_planned, districts_with_DT_plan, districts_with_feeder_plan. Use this for any zone/region comparison or ranking question.",
+        "description": "Aggregate key metrics grouped by zone or region: total_districts, total_DTs, total_SDs_FY26, total_planned_SDs_FY27, total_feeders, total_DSEs_current, total_DSEs_addition_planned, total_DTs_addition_planned, districts_with_DT_plan, districts_with_feeder_plan. Use this for any zone/region comparison or ranking question.",
         "input_schema": {
             "type": "object",
             "properties": {
