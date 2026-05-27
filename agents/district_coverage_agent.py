@@ -110,10 +110,23 @@ def get_dt_appointment_plan(zone: str = None, region: str = None, month: str = N
 def get_feeder_plan(zone: str = None, region: str = None) -> dict:
     df = _get_df().copy()
     df = df[df["Feeder Appointment Plan"] == 1]
-    if zone:
-        df = df[df["Zone Description"].str.contains(zone, case=False, na=False)]
-    if region:
-        df = df[df["Region Description"].str.contains(region, case=False, na=False)]
+    if zone and zone.strip():
+        df = df[df["Zone Description"].str.contains(zone.strip(), case=False, na=False)]
+    if region and region.strip():
+        df = df[df["Region Description"].str.contains(region.strip(), case=False, na=False)]
+
+    zone_summary = (
+        df.groupby("Zone Description")["No of FDs Appointment Plan (1,2,3 etc)"]
+        .agg(districts_with_plan="count", total_FDs_planned="sum")
+        .reset_index()
+        .to_dict(orient="records")
+    )
+    region_summary = (
+        df.groupby(["Zone Description", "Region Description"])["No of FDs Appointment Plan (1,2,3 etc)"]
+        .agg(districts_with_plan="count", total_FDs_planned="sum")
+        .reset_index()
+        .to_dict(orient="records")
+    )
 
     cols = [
         "Zone Description", "Region Description", "District Name",
@@ -121,7 +134,7 @@ def get_feeder_plan(zone: str = None, region: str = None) -> dict:
         "Month of Appoinment Plan", "Current Count of Feeders",
     ]
     records = df[cols].where(df[cols].notna(), None).to_dict(orient="records")
-    return {"matched": len(records), "data": records}
+    return {"matched": len(records), "zone_summary": zone_summary, "region_summary": region_summary, "data": records}
 
 
 def get_dse_plan(zone: str = None, region: str = None, dse_count: int = None) -> dict:
@@ -172,6 +185,7 @@ def aggregate_by_zone_or_region(group_by: str = "zone") -> dict:
         total_DSEs_current=("Current No of DSEs", "sum"),
         total_DSEs_addition_planned=("No of DSEs Addition Plan (1,2,3 etc)", "sum"),
         total_DTs_addition_planned=("No of DTs Appointment Plan (1,2,3 etc)", "sum"),
+        total_FDs_addition_planned=("No of FDs Appointment Plan (1,2,3 etc)", "sum"),
     ).round(1).reset_index()
 
     dt_yes = df[df["DT Appointment Plan (Y/N)"] == "Y"]
@@ -308,7 +322,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "get_feeder_plan",
-        "description": "Return districts with a Feeder Appointment Plan, including number of FDs planned and month. Filterable by zone or region.",
+        "description": "Return districts with a Feeder Appointment Plan. Returns `zone_summary` (zone-level totals: districts_with_plan, total_FDs_planned), `region_summary`, and `data` (district rows). Filterable by zone or region.",
         "input_schema": {
             "type": "object",
             "properties": {
