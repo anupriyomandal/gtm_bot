@@ -11,12 +11,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from openai import OpenAI
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 
 load_dotenv(Path(__file__).parent / ".env")
 
 from agents.district_coverage_agent import run_agent  # noqa: E402 — after load_dotenv
+
+_oai = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # ---------------------------------------------------------------------------
 # Slack app
@@ -42,15 +45,24 @@ def _set_history(channel: str, history: list) -> None:
         _histories[channel] = history
 
 
-# Keywords that signal the user wants the answer posted in the main channel
-_CHANNEL_POST_PHRASES = re.compile(
-    r"\b(post in channel|share in channel|reply in channel|post here|share here|reply here|share with (the )?team|post (it |this )?(to |in )?(the )?channel)\b",
-    re.IGNORECASE,
-)
-
-
 def _wants_channel_post(text: str) -> bool:
-    return bool(_CHANNEL_POST_PHRASES.search(text))
+    """Use GPT-4.1-mini to detect if the user wants the answer posted to the main channel."""
+    resp = _oai.chat.completions.create(
+        model="gpt-4.1-mini",
+        max_tokens=1,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You detect whether a user wants a bot response posted to the main Slack channel "
+                    "(visible to everyone) rather than as a private thread reply. "
+                    "Reply with only 'yes' or 'no'."
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    return resp.choices[0].message.content.strip().lower() == "yes"
 
 
 def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel: bool, client) -> None:
