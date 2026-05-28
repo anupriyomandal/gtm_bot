@@ -33,20 +33,6 @@ slack_app = App(
     signing_secret=os.environ["SLACK_SIGNING_SECRET"],
 )
 
-# Per-channel conversation history (in-memory, resets on redeploy)
-_histories: dict[str, list] = {}
-_histories_lock = threading.Lock()
-
-
-def _get_history(channel: str) -> list | None:
-    with _histories_lock:
-        return _histories.get(channel)
-
-
-def _set_history(channel: str, history: list) -> None:
-    with _histories_lock:
-        _histories[channel] = history
-
 
 class _ChannelPost(BaseModel):
     wants_channel_post: Literal["yes", "no"]
@@ -75,10 +61,8 @@ def _wants_channel_post(text: str) -> bool:
 def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel: bool, client) -> None:
     """Run the agent in a background thread and post the result back."""
     try:
-        history = _get_history(channel)
-        answer, new_history = run_routed_agent(text, history=history, verbose=False)
+        answer, _ = run_routed_agent(text, history=None, verbose=False)
         fallback_text, blocks = format_for_slack(answer)
-        _set_history(channel, new_history)
     except Exception as exc:
         fallback_text = f"Sorry, something went wrong: {exc}"
         blocks = []
