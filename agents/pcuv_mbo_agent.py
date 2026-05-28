@@ -57,11 +57,13 @@ def get_appointment_count(
     group_by: str = "zone",
     extra_columns: list = None,
     volume_months: list = None,
+    pivot_months: list = None,
 ) -> dict:
     """
     Count appointments and optionally aggregate extra columns.
-    extra_columns: list of "potential", "fy27_avg", "monthly_volume"
-    volume_months: specific months for monthly_volume, e.g. ["Apr-26", "May-26"]; omit for all 12
+    pivot_months: when provided, creates a pivot table (group × appointment month → count).
+    extra_columns: list of "potential", "fy27_avg", "monthly_volume" (sales volume data).
+    volume_months: specific months for monthly_volume sales columns.
     """
     df = _get_df().copy()
     if zone and zone.strip():
@@ -81,13 +83,38 @@ def get_appointment_count(
         "month": "Month of Appointment for New Channel Partner",
     }.get(group_by.lower(), "Zone Description")
 
+    # --- Pivot table mode: count dealers appointed per month across groups ---
+    if pivot_months:
+        appt_col = "Month of Appointment for New Channel Partner"
+        filtered = df[df[appt_col].isin(pivot_months)]
+        pivot = (
+            filtered.groupby([group_col, appt_col])
+            .size()
+            .unstack(fill_value=0)
+            .reindex(columns=[m for m in pivot_months if m in filtered[appt_col].unique()], fill_value=0)
+        )
+        pivot["TOTAL"] = pivot.sum(axis=1)
+        pivot = pivot.reset_index().sort_values("TOTAL", ascending=False)
+
+        total_row = {group_col: "TOTAL"}
+        for col in pivot.columns[1:]:
+            total_row[col] = int(pivot[col].sum()) if col == "TOTAL" else int(pivot[col].sum())
+        result_with_total = pd.concat([pivot, pd.DataFrame([total_row])], ignore_index=True)
+        table_str = result_with_total.to_string(index=False)
+        return {
+            "group_by": group_col,
+            "pivot_months": pivot_months,
+            "total_appointments": int(filtered.shape[0]),
+            "formatted_table": table_str,
+        }
+
+    # --- Standard aggregation mode ---
     extras = extra_columns or []
     months_requested = (
         [m for m in (volume_months or _ALL_MONTHS) if m in df.columns]
         if "monthly_volume" in extras else []
     )
 
-    # Build aggregation spec
     agg_spec: dict = {"Appointments": (group_col, "size")}
     if "potential" in extras:
         agg_spec["FY26 DAP Potential"] = ("FY26 DAP Potential", "sum")
@@ -102,13 +129,10 @@ def get_appointment_count(
         .reset_index()
         .sort_values("Appointments", ascending=False)
     )
-
-    # Round all float columns
     for col in result.columns:
         if result[col].dtype == float:
             result[col] = result[col].round(1)
 
-    # Build TOTAL row and append for aligned formatting
     total_row: dict = {group_col: "TOTAL", "Appointments": int(len(df))}
     if "potential" in extras:
         total_row["FY26 DAP Potential"] = round(float(df["FY26 DAP Potential"].sum()), 1)
@@ -119,7 +143,6 @@ def get_appointment_count(
 
     result_with_total = pd.concat([result, pd.DataFrame([total_row])], ignore_index=True)
     table_str = result_with_total.to_string(index=False)
-
     return {
         "group_by": group_col,
         "data": result.to_dict(orient="records"),
@@ -220,6 +243,16 @@ TOOLS: list[dict] = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Specific months to show when monthly_volume is requested, e.g. ['Apr-26', 'May-26']. Omit for all 12 months.",
+                },
+                "pivot_months": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Use when user asks for appointment COUNT across multiple specific months. "
+                        "Creates a pivot table: rows = group_by dimension, columns = each month, values = count of dealers appointed that month. "
+                        "E.g. pivot_months=['Apr-26','May-26','Jun-26'] shows how many dealers appointed per zone per month. "
+                        "Do NOT use extra_columns when using pivot_months."
+                    ),
                 },
             },
             "required": [],
@@ -325,14 +358,13 @@ Never guess column values — use exact values from the descriptions above.
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
 - For ANY question about appointment counts, potential, or volume plan — ALWAYS call `get_appointment_count`. NEVER use `run_pandas` for these.
-  - User asks for count only → no extra_columns
-  - User asks for count + potential → extra_columns=["potential"]
-  - User asks for count + FY27 volume → extra_columns=["fy27_avg"]
-  - User asks for count + specific month volumes → extra_columns=["monthly_volume"], volume_months=["Apr-26", ...]
-  - User asks for count + all monthly volumes → extra_columns=["monthly_volume"]
-  - Combine freely, e.g. extra_columns=["potential", "fy27_avg"]
-- When presenting get_appointment_count results, ALWAYS use the `formatted_table` field and wrap it in triple backticks. Never reformat as bullet points.
-- Monthly sales columns (Apr-26 … Mar-27) = planned SALES VOLUME — handled by get_appointment_count with extra_columns=["monthly_volume"]. Do not use run_pandas for these.
+  - Count only → no extra_columns, no pivot_months
+  - Count across multiple months (e.g. "Apr, May, Jun appointment plan") → pivot_months=["Apr-26","May-26","Jun-26"] — this shows count per zone per month
+  - Count + potential → extra_columns=["potential"]
+  - Count + FY27 volume plan → extra_columns=["fy27_avg"]
+  - Sales volume for specific months → extra_columns=["monthly_volume"], volume_months=["Apr-26",...]
+  - "Appointment plan" always means COUNT — never interpret it as sales volume
+- When presenting results, ALWAYS use the `formatted_table` field and wrap in triple backticks. Never reformat as bullet points.
 
 ## Formatting (Slack mrkdwn)
 - Use *bold* for headers and key labels
