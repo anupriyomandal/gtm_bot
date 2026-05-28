@@ -489,6 +489,7 @@ Before calling any data tool, ALWAYS call `think` first to:
 Then call the appropriate data tool. After observing the result, reason again if needed before answering.
 
 ## Guidelines
+- When the user says "X RO" or "X Regional Office", treat it as region = "X" — the suffix "RO" is not stored in the data. E.g. "Asansol RO" → filter Region Description = "Asansol".
 - Use `run_pandas` only for queries no other tool can handle.
 - NEVER answer questions about SIS / CS / MBO / PCUV dealer appointments yourself — ALWAYS call `transfer_to_pcuv_mbo_agent` immediately for these.
 - Be concise and specific. Format numbers clearly.

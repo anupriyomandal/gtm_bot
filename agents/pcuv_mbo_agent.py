@@ -193,6 +193,7 @@ After observing the result, reason again if needed before answering.
 Never guess column values — use exact values from the descriptions above.
 
 ## Critical rules
+- When the user says "X RO" or "X Regional Office", treat it as region = "X" — the suffix "RO" is not stored in the data. E.g. "Ernakulam RO" → filter Region Description = "Ernakulam".
 - If the user asks about district coverage data (DT counts, SD counts, DSE/feeder plans, coverage gaps), call `transfer_to_district_coverage_agent` immediately — that data does not exist in this dataset.
 - ALWAYS include `Customer Name` in results whenever showing dealer-level data
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
