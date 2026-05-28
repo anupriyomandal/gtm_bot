@@ -37,6 +37,12 @@ def _get_df() -> pd.DataFrame:
 # Tool implementations
 # ---------------------------------------------------------------------------
 
+def _transfer_to_dc(question: str) -> dict:
+    from agents.district_coverage_agent import run_agent as _dc_run
+    answer, _ = _dc_run(question, history=None, verbose=False)
+    return {"answer": answer}
+
+
 def run_pandas(code: str) -> dict:
     """
     Execute pandas code against the PCUV MBO planning dataframe.
@@ -76,6 +82,24 @@ def run_pandas(code: str) -> dict:
 # ---------------------------------------------------------------------------
 
 TOOLS: list[dict] = [
+    {
+        "name": "transfer_to_district_coverage_agent",
+        "description": (
+            "Use this tool when the user asks about district coverage data — DT counts, SD counts, "
+            "DSE plans, feeder plans, coverage gaps, or DT appointment plans by zone/region/district. "
+            "That data does not exist in this dataset. Forward the question verbatim."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The user's question to forward to the District Coverage agent, verbatim.",
+                },
+            },
+            "required": ["question"],
+        },
+    },
     {
         "name": "think",
         "description": (
@@ -132,6 +156,7 @@ _OAI_TOOLS = [
 # ---------------------------------------------------------------------------
 
 TOOL_FN_MAP = {
+    "transfer_to_district_coverage_agent": lambda args: _transfer_to_dc(**args),
     "think": lambda args: {"ok": True},
     "run_pandas": lambda args: run_pandas(**args),
 }
@@ -168,6 +193,7 @@ After observing the result, reason again if needed before answering.
 Never guess column values — use exact values from the descriptions above.
 
 ## Critical rules
+- If the user asks about district coverage data (DT counts, SD counts, DSE/feeder plans, coverage gaps), call `transfer_to_district_coverage_agent` immediately — that data does not exist in this dataset.
 - ALWAYS include `Customer Name` in results whenever showing dealer-level data
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
@@ -217,6 +243,8 @@ def run_agent(user_query: str, history: list = None, verbose: bool = True) -> tu
                 if verbose:
                     if tc.function.name == "think":
                         print(f"  [pcuv:think] {args.get('reasoning', '')[:200]}")
+                    elif tc.function.name == "transfer_to_district_coverage_agent":
+                        print(f"  [pcuv:handoff->dc] {args.get('question', '')[:120]}")
                     else:
                         print(f"  [pcuv:tool] {tc.function.name}({json.dumps(args, default=str)[:120]})")
                 result_str = dispatch_tool(tc.function.name, args)

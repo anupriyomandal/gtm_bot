@@ -17,7 +17,8 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 
 load_dotenv(Path(__file__).parent / ".env")
 
-from agents.district_coverage_agent import run_agent  # noqa: E402 — after load_dotenv
+from agents.router import run_routed_agent  # noqa: E402 — after load_dotenv
+from agents.formatter import format_for_slack  # noqa: E402
 
 _oai = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
@@ -69,7 +70,8 @@ def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel
     """Run the agent in a background thread and post the result back."""
     try:
         history = _get_history(channel)
-        answer, new_history = run_agent(text, history=history, verbose=False)
+        answer, new_history = run_routed_agent(text, history=history, verbose=False)
+        answer = format_for_slack(answer)
         _set_history(channel, new_history)
     except Exception as exc:
         answer = f"Sorry, something went wrong: {exc}"
