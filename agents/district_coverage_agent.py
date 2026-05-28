@@ -500,15 +500,27 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use `backticks` for codes or numbers to highlight
 - NEVER use markdown pipe tables (| col | col |) — Slack does not render them
 - For tabular output:
-  1. Select ONLY the columns directly relevant to the user's question — never dump all columns.
-  2. Rename columns to short, human-readable names BEFORE calling to_string() — e.g. rename 'total_dses_planned' to 'DSE Additions', 'districts_with_plan' to 'Districts', 'total_DTs_addition_planned' to 'DT Additions'. Keep 'Zone Description' and 'Region Description' exactly as-is. Use df.rename(columns={...}) or assign clean column names directly.
+  1. CRITICAL — only include columns the user explicitly asked about. For a DSE plan question show only Zone/Region + DSE Additions. For a DT plan question show only Zone/Region + DT Additions. Never include total_districts, districts_with_DT_plan, districts_with_feeder_plan, or any other column the user did not ask for.
+  2. Rename ALL raw column names to human-readable labels BEFORE to_string():
+       df = df.rename(columns={
+           'total_dses_planned': 'DSE Additions',
+           'total_DSEs_addition_planned': 'DSE Additions',
+           'districts_with_plan': 'Districts',
+           'total_DTs_addition_planned': 'DT Additions',
+           'total_FDs_addition_planned': 'FD Additions',
+           'total_dts_planned': 'DT Additions',
+           'total_FDs_planned': 'FD Additions',
+       })
+       Keep 'Zone Description' and 'Region Description' exactly as-is.
   3. Add a TOTAL row INSIDE the DataFrame before calling to_string():
+       label_col = df.columns[0]
+       numeric_cols = df.select_dtypes('number').columns.tolist()
        total = df[numeric_cols].sum()
        total[label_col] = 'TOTAL'
        df = pd.concat([df, pd.DataFrame([total])], ignore_index=True)
-  4. Cast numeric columns to int before to_string() to avoid '44.0' style output:
+  4. Cast numeric columns to int to avoid '44.0':
        for c in numeric_cols: df[c] = df[c].astype(int)
-  5. Call df[cols].to_string(index=False) and wrap in triple backticks.
+  5. Call df[final_cols].to_string(index=False) and wrap in triple backticks.
 - Never use ## headers — use *bold* labels instead
 - Never use **double asterisk bold** inside code blocks — plain text only inside backticks"""
 
