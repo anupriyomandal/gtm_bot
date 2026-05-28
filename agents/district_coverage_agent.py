@@ -15,6 +15,8 @@ import pandas as pd
 
 load_dotenv(Path(__file__).parent / ".env")
 
+from agents.pcuv_mbo_agent import run_agent as _pcuv_run_agent  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
@@ -402,14 +404,42 @@ TOOLS: list[dict] = [
             "required": ["code"],
         },
     },
+    {
+        "name": "transfer_to_pcuv_mbo_agent",
+        "description": (
+            "Hand off the question to the PCUV MBO Appointment Agent. "
+            "Use this whenever the user asks about: PCUV new dealer appointments, "
+            "MBO / CS / SIS / normal dealer appointments, how many new PCUV dealers are being planned, "
+            "PCUV appointment months, PCUV sales plan for new partners, or anything related to "
+            "Passenger Car & UV tyre new channel partner planning."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The user's question to forward to the PCUV MBO agent, verbatim.",
+                },
+            },
+            "required": ["question"],
+        },
+    },
 ]
 
 # ---------------------------------------------------------------------------
 # Tool dispatcher
 # ---------------------------------------------------------------------------
 
+_pcuv_history: dict[str, list] = {}  # keyed by channel to preserve PCUV context per conversation
+
+
+def _transfer_to_pcuv(question: str) -> dict:
+    answer, _ = _pcuv_run_agent(question, history=None, verbose=False)
+    return {"answer": answer}
+
+
 TOOL_FN_MAP = {
-    "think": lambda args: {"ok": True},  # reasoning step — no data side-effect
+    "think": lambda args: {"ok": True},
     "load_data": lambda args: load_data(),
     "get_summary": lambda args: get_summary(),
     "filter_by_geography": lambda args: filter_by_geography(**args),
@@ -420,6 +450,7 @@ TOOL_FN_MAP = {
     "search_district": lambda args: search_district(**args),
     "get_coverage_gaps": lambda args: get_coverage_gaps(**args),
     "run_pandas": lambda args: run_pandas(**args),
+    "transfer_to_pcuv_mbo_agent": lambda args: _transfer_to_pcuv(**args),
 }
 
 
@@ -511,6 +542,8 @@ def run_agent(user_query: str, history: list = None, verbose: bool = True) -> tu
                 if verbose:
                     if tc.function.name == "think":
                         print(f"  [think] {args.get('reasoning', '')[:200]}")
+                    elif tc.function.name == "transfer_to_pcuv_mbo_agent":
+                        print(f"  [handoff->pcuv_mbo_agent] {args.get('question', '')[:120]}")
                     else:
                         print(f"  [tool] {tc.function.name}({json.dumps(args, default=str)[:120]})")
                 result_str = dispatch_tool(tc.function.name, args)
