@@ -208,9 +208,16 @@ Never guess column values — use exact values from the descriptions above.
 ## Formatting (Slack mrkdwn)
 - Use *bold* for headers and key labels
 - Use - for bullet lists
-- Wrap tables in triple backticks for aligned monospace display
-- Never use ## headers or markdown tables
-- ALWAYS add a grand total row at the bottom of every table"""
+- NEVER use markdown pipe tables (| col | col |) — Slack does not render them
+- ALWAYS wrap tabular data in triple backticks so columns align in monospace, like this:
+  ```
+  Name                | Col1  | Col2
+  --------------------|-------|------
+  Row 1               | 100   | 200
+  TOTAL               | 100   | 200
+  ```
+- Never use ## headers or **double asterisk bold** inside code blocks — plain text only inside backticks
+- ALWAYS add a TOTAL row at the bottom of every table"""
 
 # ---------------------------------------------------------------------------
 # Agent loop

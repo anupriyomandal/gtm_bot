@@ -497,9 +497,17 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use *bold* for headers and key labels (NOT **double asterisk**)
 - Use - for bullet lists
 - Use `backticks` for codes or numbers to highlight
-- Never use markdown tables — wrap tables in triple backticks (code block) so columns align in monospace
+- NEVER use markdown pipe tables (| col | col |) — Slack does not render them
+- ALWAYS wrap tabular data in triple backticks so columns align in monospace, like this:
+  ```
+  Name                | Col1  | Col2
+  --------------------|-------|------
+  Row 1               | 100   | 200
+  TOTAL               | 100   | 200
+  ```
 - Never use ## headers — use *bold* labels instead
-- ALWAYS add a grand total row at the bottom of every table"""
+- Never use **double asterisk bold** inside code blocks — plain text only inside backticks
+- ALWAYS add a TOTAL row at the bottom of every table"""
 
 # Convert Anthropic-style tool schemas → OpenAI function format
 _OAI_TOOLS = [
