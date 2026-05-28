@@ -500,7 +500,7 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use `backticks` for codes or numbers to highlight
 - NEVER use markdown pipe tables (| col | col |) — Slack does not render them
 - For tabular output:
-  1. CRITICAL — only include columns the user explicitly asked about. For a DSE plan question show only Zone/Region + DSE Additions. For a DT plan question show only Zone/Region + DT Additions. Never include total_districts, districts_with_DT_plan, districts_with_feeder_plan, or any other column the user did not ask for.
+  1. CRITICAL — always produce ONE single table, never multiple separate tables. If the user asks for multiple metrics (e.g. DSE and Feeder additions), combine them as columns in a single table. Include ALL zones even if a value is 0 — never filter out rows. Only include columns the user explicitly asked about; never include total_districts, districts_with_DT_plan, districts_with_feeder_plan, or any unrequested column.
   2. Rename ALL raw column names to human-readable labels BEFORE to_string():
        df = df.rename(columns={
            'total_dses_planned': 'DSE Additions',
