@@ -8,10 +8,12 @@ import os
 import re
 import threading
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from openai import OpenAI
+from pydantic import BaseModel
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 
@@ -46,24 +48,28 @@ def _set_history(channel: str, history: list) -> None:
         _histories[channel] = history
 
 
+class _ChannelPost(BaseModel):
+    wants_channel_post: Literal["yes", "no"]
+
+
 def _wants_channel_post(text: str) -> bool:
-    """Use GPT-4.1-mini to detect if the user wants the answer posted to the main channel."""
-    resp = _oai.chat.completions.create(
+    """Detect if the user wants the answer posted to the main channel."""
+    resp = _oai.beta.chat.completions.parse(
         model="gpt-5.4-mini",
-        max_completion_tokens=1,
         messages=[
             {
                 "role": "system",
                 "content": (
                     "You detect whether a user wants a bot response posted to the main Slack channel "
-                    "(visible to everyone) rather than as a private thread reply. "
-                    "Reply with only 'yes' or 'no'."
+                    "(visible to everyone) rather than as a private thread reply."
                 ),
             },
             {"role": "user", "content": text},
         ],
+        response_format=_ChannelPost,
     )
-    return resp.choices[0].message.content.strip().lower() == "yes"
+    parsed = resp.choices[0].message.parsed
+    return parsed.wants_channel_post == "yes" if parsed else False
 
 
 def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel: bool, client) -> None:
