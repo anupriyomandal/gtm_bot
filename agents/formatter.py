@@ -65,9 +65,13 @@ def _section(text: str) -> dict:
 
 
 def _table_block(table: _TableData) -> dict:
+    def _cell(val: str) -> dict:
+        text = _clean_num(str(val))
+        return {"type": "raw_text", "text": text if text.strip() else "-"}
+
     header_row = [{"type": "raw_text", "text": h} for h in table.headers]
     data_rows = [
-        [{"type": "raw_text", "text": _clean_num(str(cell))} for cell in row]
+        [_cell(cell) for cell in row]
         for row in table.rows
     ]
     return {"type": "table", "rows": [header_row] + data_rows}
