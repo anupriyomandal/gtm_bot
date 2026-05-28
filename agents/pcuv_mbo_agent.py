@@ -397,7 +397,7 @@ def run_agent(user_query: str, history: list = None, verbose: bool = True) -> tu
 
     while True:
         response = client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="gpt-5.4-mini",
             tools=_OAI_TOOLS,
             tool_choice="auto",
             messages=history,

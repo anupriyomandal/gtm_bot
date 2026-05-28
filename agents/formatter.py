@@ -78,7 +78,7 @@ def format_for_slack(answer: str) -> tuple[str, list]:
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     result = client.beta.chat.completions.parse(
-        model="gpt-4.1-mini",
+        model="gpt-5.4-mini",
         messages=[
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": answer},

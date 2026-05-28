@@ -35,7 +35,7 @@ def _classify(question: str, history: list | None, client: OpenAI) -> str:
     messages.append({"role": "user", "content": question})
 
     resp = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-5.4-mini",
         messages=messages,
         max_tokens=10,
     )
