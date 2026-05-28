@@ -37,7 +37,7 @@ def _classify(question: str, history: list | None, client: OpenAI) -> str:
     resp = client.chat.completions.create(
         model="gpt-5.4-mini",
         messages=messages,
-        max_tokens=10,
+        max_completion_tokens=10,
     )
     label = resp.choices[0].message.content.strip().lower()
     return label if label in ("district_coverage", "pcuv_mbo") else "district_coverage"

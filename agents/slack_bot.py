@@ -50,7 +50,7 @@ def _wants_channel_post(text: str) -> bool:
     """Use GPT-4.1-mini to detect if the user wants the answer posted to the main channel."""
     resp = _oai.chat.completions.create(
         model="gpt-5.4-mini",
-        max_tokens=1,
+        max_completion_tokens=1,
         messages=[
             {
                 "role": "system",
