@@ -210,15 +210,12 @@ Never guess column values — use exact values from the descriptions above.
 - Use *bold* for headers and key labels
 - Use - for bullet lists
 - NEVER use markdown pipe tables (| col | col |) — Slack does not render them
-- ALWAYS wrap tabular data in triple backticks so columns align in monospace, like this:
-  ```
-  Name                | Col1  | Col2
-  --------------------|-------|------
-  Row 1               | 100   | 200
-  TOTAL               | 100   | 200
-  ```
-- Never use ## headers or **double asterisk bold** inside code blocks — plain text only inside backticks
-- ALWAYS add a TOTAL row at the bottom of every table"""
+- For tabular output, generate an aligned string using pandas and wrap in triple backticks:
+  result = df[cols].to_string(index=False)
+  Then in your answer: wrap that string in triple backticks. pandas to_string() handles column widths automatically — never hand-pad columns yourself.
+- Append a TOTAL row as a plain-text line after the table (outside the pandas output), e.g.:
+  TOTAL    | 3700.0 | 418.75
+- Never use ## headers or **double asterisk bold** inside code blocks — plain text only inside backticks"""
 
 # ---------------------------------------------------------------------------
 # Agent loop
