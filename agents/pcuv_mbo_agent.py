@@ -78,10 +78,13 @@ def get_appointment_count(
         .reset_index(name="appointment_count")
         .sort_values("appointment_count", ascending=False)
     )
+    total = int(len(df))
+    table_str = counts.to_string(index=False)
     return {
         "group_by": group_col,
         "data": counts.to_dict(orient="records"),
-        "total": int(len(df)),
+        "total": total,
+        "formatted_table": f"{table_str}\nTOTAL{' ' * (len(group_col) - 5)}{total}",
     }
 
 
@@ -266,6 +269,7 @@ Never guess column values — use exact values from the descriptions above.
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
 - For ANY question about how many dealers/appointments are planned (by zone, region, channel, month) — ALWAYS call `get_appointment_count`. NEVER use `run_pandas` for counting appointments.
+- When presenting get_appointment_count results, ALWAYS use the `formatted_table` field from the result and wrap it in triple backticks. Never reformat as bullet points.
 - Monthly sales columns (Apr-26 … Mar-27) = planned SALES VOLUME only. Use `run_pandas` ONLY when the user explicitly asks for sales volume, potential, or FY27 Avg — never for counting dealers.
 
 ## Formatting (Slack mrkdwn)
