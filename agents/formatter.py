@@ -5,6 +5,7 @@ Uses structured output (Pydantic + .parse) to extract table data reliably.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -36,8 +37,8 @@ summary: One-line key finding (≤15 words). Return "" if the answer already sta
 text: The full answer with these changes applied:
   - Prefix any line describing zero or missing data (0 DTs, no SDs, no appointments, zero plan, NaN) with ⚠️
   - Use single asterisks *bold* only — never **double asterisks**
-  - If a table exists (code block or pipe-separated), replace the entire table block with the single word [TABLE]
-  - Keep all other content exactly as-is
+  - CRITICAL: If a table exists anywhere (code block with ```, pipe-separated rows, or space-aligned columns), you MUST remove the entire table from this field and replace it with the single literal string [TABLE] — nothing else, just [TABLE]. The table will be rendered separately. Do NOT leave any table content in text.
+  - Keep all non-table content exactly as-is
 
 table: If a table exists, extract {"headers": [...], "rows": [[...], ...]} with every cell value as a string.
   Include the TOTAL/GRAND TOTAL row in rows. Return null if no table."""
@@ -88,6 +89,15 @@ def format_for_slack(answer: str) -> tuple[str, list]:
     parsed = result.choices[0].message.parsed
     if parsed is None:
         return answer, []
+
+    # Safety net: if GPT extracted a table but forgot to put [TABLE] in text,
+    # strip code blocks from text programmatically rather than showing both.
+    if parsed.table and "[TABLE]" not in parsed.text:
+        parsed.text = re.sub(r"```[\s\S]*?```", "[TABLE]", parsed.text)
+        # If still no [TABLE] (table was plain text, not code block), clear the text body
+        # and let the table block carry the content
+        if "[TABLE]" not in parsed.text:
+            parsed.text = parsed.text  # leave as-is; table block appends below
 
     prefix = f"*{parsed.summary}*\n\n" if parsed.summary else ""
 
