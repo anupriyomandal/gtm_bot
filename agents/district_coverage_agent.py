@@ -407,11 +407,12 @@ TOOLS: list[dict] = [
     {
         "name": "transfer_to_pcuv_mbo_agent",
         "description": (
-            "Hand off the question to the PCUV MBO Appointment Agent. "
-            "Use this whenever the user asks about: PCUV new dealer appointments, "
-            "MBO / CS / SIS / normal dealer appointments, how many new PCUV dealers are being planned, "
-            "PCUV appointment months, PCUV sales plan for new partners, or anything related to "
-            "Passenger Car & UV tyre new channel partner planning."
+            "ALWAYS use this tool — without exception — when the user asks anything about: "
+            "SIS (Shop-in-Shop), CS (CEAT Shoppe), MBO (Multi-Brand Outlet), normal dealer appointments, "
+            "PCUV new dealer / channel partner appointments, new dealer appointment months, "
+            "PCUV sales plan for new partners, or Passenger Car & UV tyre new channel partner planning. "
+            "Do NOT try to answer these from the district coverage dataset — that data does not exist there. "
+            "Forward the question verbatim to this agent immediately."
         ),
         "input_schema": {
             "type": "object",
@@ -489,6 +490,7 @@ Then call the appropriate data tool. After observing the result, reason again if
 
 ## Guidelines
 - Use `run_pandas` only for queries no other tool can handle.
+- NEVER answer questions about SIS / CS / MBO / PCUV dealer appointments yourself — ALWAYS call `transfer_to_pcuv_mbo_agent` immediately for these.
 - Be concise and specific. Format numbers clearly.
 
 ## Formatting (Slack mrkdwn)
