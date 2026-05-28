@@ -43,17 +43,25 @@ def _transfer_to_dc(question: str) -> dict:
     return {"answer": answer}
 
 
+_ALL_MONTHS = [
+    "Apr-26", "May-26", "Jun-26", "Jul-26", "Aug-26", "Sep-26",
+    "Oct-26", "Nov-26", "Dec-26", "Jan-27", "Feb-27", "Mar-27",
+]
+
+
 def get_appointment_count(
     zone: str = None,
     region: str = None,
     channel_type: str = None,
     month: str = None,
     group_by: str = "zone",
-    include_volume: bool = False,
+    extra_columns: list = None,
+    volume_months: list = None,
 ) -> dict:
     """
-    Count new channel partner appointments by counting rows.
-    ALWAYS use this tool for any question about appointment counts — never use run_pandas for counting.
+    Count appointments and optionally aggregate extra columns.
+    extra_columns: list of "potential", "fy27_avg", "monthly_volume"
+    volume_months: specific months for monthly_volume, e.g. ["Apr-26", "May-26"]; omit for all 12
     """
     df = _get_df().copy()
     if zone and zone.strip():
@@ -73,43 +81,50 @@ def get_appointment_count(
         "month": "Month of Appointment for New Channel Partner",
     }.get(group_by.lower(), "Zone Description")
 
-    total_appts = int(len(df))
+    extras = extra_columns or []
+    months_requested = (
+        [m for m in (volume_months or _ALL_MONTHS) if m in df.columns]
+        if "monthly_volume" in extras else []
+    )
 
-    if include_volume:
-        summary = (
-            df.groupby(group_col)
-            .agg(Appointments=(group_col, "size"), FY27_Vol_Plan=("FY27 Avg", "sum"))
-            .reset_index()
-            .sort_values("Appointments", ascending=False)
-        )
-        summary["FY27_Vol_Plan"] = summary["FY27_Vol_Plan"].round(1)
-        summary = summary.rename(columns={"FY27_Vol_Plan": "FY27 Vol Plan"})
-        total_vol = round(float(df["FY27 Avg"].sum()), 1)
-        table_str = summary.to_string(index=False)
-        pad = max(0, len(group_col) - 5)
-        total_row = f"TOTAL{' ' * pad}  {total_appts}       {total_vol}"
-        return {
-            "group_by": group_col,
-            "data": summary.to_dict(orient="records"),
-            "total_appointments": total_appts,
-            "total_fy27_volume": total_vol,
-            "formatted_table": f"{table_str}\n{total_row}",
-        }
+    # Build aggregation spec
+    agg_spec: dict = {"Appointments": (group_col, "size")}
+    if "potential" in extras:
+        agg_spec["FY26 DAP Potential"] = ("FY26 DAP Potential", "sum")
+    if "fy27_avg" in extras:
+        agg_spec["FY27 Vol Plan"] = ("FY27 Avg", "sum")
+    for m in months_requested:
+        agg_spec[m] = (m, "sum")
 
-    counts = (
+    result = (
         df.groupby(group_col)
-        .size()
-        .reset_index(name="Appointments")
+        .agg(**agg_spec)
+        .reset_index()
         .sort_values("Appointments", ascending=False)
     )
-    table_str = counts.to_string(index=False)
-    pad = max(0, len(group_col) - 5)
-    total_row = f"TOTAL{' ' * pad}  {total_appts}"
+
+    # Round all float columns
+    for col in result.columns:
+        if result[col].dtype == float:
+            result[col] = result[col].round(1)
+
+    # Build TOTAL row and append for aligned formatting
+    total_row: dict = {group_col: "TOTAL", "Appointments": int(len(df))}
+    if "potential" in extras:
+        total_row["FY26 DAP Potential"] = round(float(df["FY26 DAP Potential"].sum()), 1)
+    if "fy27_avg" in extras:
+        total_row["FY27 Vol Plan"] = round(float(df["FY27 Avg"].sum()), 1)
+    for m in months_requested:
+        total_row[m] = round(float(df[m].sum()), 1)
+
+    result_with_total = pd.concat([result, pd.DataFrame([total_row])], ignore_index=True)
+    table_str = result_with_total.to_string(index=False)
+
     return {
         "group_by": group_col,
-        "data": counts.to_dict(orient="records"),
-        "total_appointments": total_appts,
-        "formatted_table": f"{table_str}\n{total_row}",
+        "data": result.to_dict(orient="records"),
+        "total_appointments": int(len(df)),
+        "formatted_table": table_str,
     }
 
 
@@ -173,25 +188,38 @@ TOOLS: list[dict] = [
     {
         "name": "get_appointment_count",
         "description": (
-            "Count new channel partner appointments by geography or channel type. "
-            "ALWAYS use this tool — never run_pandas — when the user asks how many dealers/appointments are planned. "
-            "Set include_volume=true only when the user explicitly asks for FY27 volume plan alongside the count."
+            "Count new channel partner appointments and optionally aggregate extra columns. "
+            "ALWAYS use this tool — never run_pandas — for appointment counts or any combination of "
+            "count + potential + FY27 volume + month-wise volume. "
+            "extra_columns controls what is shown; volume_months filters which months appear."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "zone": {"type": "string", "description": "Zone name substring, e.g. 'South Zone 2'. Omit if not filtering by zone."},
-                "region": {"type": "string", "description": "Region name substring, e.g. 'Ernakulam'. Omit if not filtering by region."},
-                "channel_type": {"type": "string", "description": "Exact channel type: MBO, CS, SIS, Others, or DL. Omit for all channels."},
-                "month": {"type": "string", "description": "Appointment month in Mon-YY format, e.g. 'Apr-26'. Omit for all months."},
+                "zone": {"type": "string", "description": "Zone name substring. Omit if not filtering."},
+                "region": {"type": "string", "description": "Region name substring. Omit if not filtering."},
+                "channel_type": {"type": "string", "description": "Exact channel type: MBO, CS, SIS, Others, DL. Omit for all."},
+                "month": {"type": "string", "description": "Filter to dealers appointed in this month (Mon-YY format). Omit for all months."},
                 "group_by": {
                     "type": "string",
                     "enum": ["zone", "region", "state", "channel", "month"],
-                    "description": "Group results by this dimension. Default: zone.",
+                    "description": "Dimension to group by. Default: zone.",
                 },
-                "include_volume": {
-                    "type": "boolean",
-                    "description": "Set true only when user explicitly asks for FY27 volume plan alongside appointment count.",
+                "extra_columns": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["potential", "fy27_avg", "monthly_volume"]},
+                    "description": (
+                        "Additional columns to include: "
+                        "'potential' = sum of FY26 DAP Potential; "
+                        "'fy27_avg' = sum of FY27 Avg (annual volume plan); "
+                        "'monthly_volume' = sum of sales plan for each month (use volume_months to specify which). "
+                        "Only include what the user explicitly asked for."
+                    ),
+                },
+                "volume_months": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific months to show when monthly_volume is requested, e.g. ['Apr-26', 'May-26']. Omit for all 12 months.",
                 },
             },
             "required": [],
@@ -296,9 +324,15 @@ Never guess column values — use exact values from the descriptions above.
 - ALWAYS include `Customer Name` in results whenever showing dealer-level data
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
-- For ANY question about how many dealers/appointments are planned (by zone, region, channel, month) — ALWAYS call `get_appointment_count`. NEVER use `run_pandas` for counting appointments.
-- When presenting get_appointment_count results, ALWAYS use the `formatted_table` field from the result and wrap it in triple backticks. Never reformat as bullet points.
-- Monthly sales columns (Apr-26 … Mar-27) = planned SALES VOLUME only. Use `run_pandas` ONLY when the user explicitly asks for sales volume, potential, or FY27 Avg — never for counting dealers.
+- For ANY question about appointment counts, potential, or volume plan — ALWAYS call `get_appointment_count`. NEVER use `run_pandas` for these.
+  - User asks for count only → no extra_columns
+  - User asks for count + potential → extra_columns=["potential"]
+  - User asks for count + FY27 volume → extra_columns=["fy27_avg"]
+  - User asks for count + specific month volumes → extra_columns=["monthly_volume"], volume_months=["Apr-26", ...]
+  - User asks for count + all monthly volumes → extra_columns=["monthly_volume"]
+  - Combine freely, e.g. extra_columns=["potential", "fy27_avg"]
+- When presenting get_appointment_count results, ALWAYS use the `formatted_table` field and wrap it in triple backticks. Never reformat as bullet points.
+- Monthly sales columns (Apr-26 … Mar-27) = planned SALES VOLUME — handled by get_appointment_count with extra_columns=["monthly_volume"]. Do not use run_pandas for these.
 
 ## Formatting (Slack mrkdwn)
 - Use *bold* for headers and key labels
