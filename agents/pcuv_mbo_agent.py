@@ -170,6 +170,8 @@ Never guess column values — use exact values from the descriptions above.
 ## Critical rules
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
+- "Appointment plan" or "how many appointments" = COUNT of rows using `Month of Appointment for New Channel Partner` column — NOT a sum of monthly sales columns (Apr-26 … Mar-27)
+- Monthly sales columns (Apr-26 … Mar-27) represent planned SALES VOLUME for each dealer — only use these when the user explicitly asks for sales plan, volume, or potential
 
 ## Formatting (Slack mrkdwn)
 - Use *bold* for headers and key labels
