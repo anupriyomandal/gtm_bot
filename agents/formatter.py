@@ -48,6 +48,17 @@ table: If a table exists, extract {"headers": [...], "rows": [[...], ...]} with 
 # Block Kit builders
 # ---------------------------------------------------------------------------
 
+def _clean_num(val: str) -> str:
+    """Convert '44.0' → '44'; leave non-numeric strings unchanged."""
+    try:
+        f = float(val)
+        if f == int(f):
+            return str(int(f))
+    except (ValueError, OverflowError):
+        pass
+    return val
+
+
 def _section(text: str) -> dict:
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
@@ -55,7 +66,7 @@ def _section(text: str) -> dict:
 def _table_block(table: _TableData) -> dict:
     header_row = [{"type": "raw_text", "text": h} for h in table.headers]
     data_rows = [
-        [{"type": "raw_text", "text": str(cell)} for cell in row]
+        [{"type": "raw_text", "text": _clean_num(str(cell))} for cell in row]
         for row in table.rows
     ]
     return {"type": "table", "rows": [header_row] + data_rows}
@@ -106,7 +117,8 @@ def format_for_slack(answer: str) -> tuple[str, list]:
     # --- Build fallback plain text ---
     if parsed.table:
         table_plaintext = "\n".join(
-            " | ".join(row) for row in [parsed.table.headers] + parsed.table.rows
+            " | ".join(_clean_num(cell) for cell in row)
+            for row in [parsed.table.headers] + parsed.table.rows
         )
         fallback = prefix + parsed.text.replace("[TABLE]", table_plaintext)
     else:
