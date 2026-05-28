@@ -72,19 +72,31 @@ def get_appointment_count(
         "month": "Month of Appointment for New Channel Partner",
     }.get(group_by.lower(), "Zone Description")
 
-    counts = (
+    summary = (
         df.groupby(group_col)
-        .size()
-        .reset_index(name="appointment_count")
-        .sort_values("appointment_count", ascending=False)
+        .agg(
+            Appointments=(group_col, "size"),
+            FY27_Vol_Plan=("FY27 Avg", "sum"),
+        )
+        .reset_index()
+        .sort_values("Appointments", ascending=False)
     )
-    total = int(len(df))
-    table_str = counts.to_string(index=False)
+    summary["FY27_Vol_Plan"] = summary["FY27_Vol_Plan"].round(1)
+    summary = summary.rename(columns={"FY27_Vol_Plan": "FY27 Vol Plan"})
+
+    total_appts = int(len(df))
+    total_vol = round(float(df["FY27 Avg"].sum()), 1)
+
+    table_str = summary.to_string(index=False)
+    pad = max(0, len(group_col) - 5)
+    total_row = f"TOTAL{' ' * pad}  {total_appts}       {total_vol}"
+
     return {
         "group_by": group_col,
-        "data": counts.to_dict(orient="records"),
-        "total": total,
-        "formatted_table": f"{table_str}\nTOTAL{' ' * (len(group_col) - 5)}{total}",
+        "data": summary.to_dict(orient="records"),
+        "total_appointments": total_appts,
+        "total_fy27_volume": total_vol,
+        "formatted_table": f"{table_str}\n{total_row}",
     }
 
 
@@ -148,10 +160,10 @@ TOOLS: list[dict] = [
     {
         "name": "get_appointment_count",
         "description": (
-            "Count new channel partner appointments by geography or channel type. "
+            "Count new channel partner appointments AND return FY27 volume plan by geography or channel type. "
             "ALWAYS use this tool — never run_pandas — when the user asks how many dealers/appointments "
-            "are planned (by zone, region, channel type, or month). "
-            "Counts rows using the appointment month column — never uses sales volume columns."
+            "are planned, or asks for appointment count alongside FY27 volume/plan data. "
+            "Returns both Appointments (row count) and FY27 Vol Plan (sum of FY27 Avg) per group."
         ),
         "input_schema": {
             "type": "object",
