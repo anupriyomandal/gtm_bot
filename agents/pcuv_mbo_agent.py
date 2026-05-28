@@ -49,6 +49,7 @@ def get_appointment_count(
     channel_type: str = None,
     month: str = None,
     group_by: str = "zone",
+    include_volume: bool = False,
 ) -> dict:
     """
     Count new channel partner appointments by counting rows.
@@ -72,30 +73,42 @@ def get_appointment_count(
         "month": "Month of Appointment for New Channel Partner",
     }.get(group_by.lower(), "Zone Description")
 
-    summary = (
-        df.groupby(group_col)
-        .agg(
-            Appointments=(group_col, "size"),
-            FY27_Vol_Plan=("FY27 Avg", "sum"),
+    total_appts = int(len(df))
+
+    if include_volume:
+        summary = (
+            df.groupby(group_col)
+            .agg(Appointments=(group_col, "size"), FY27_Vol_Plan=("FY27 Avg", "sum"))
+            .reset_index()
+            .sort_values("Appointments", ascending=False)
         )
-        .reset_index()
+        summary["FY27_Vol_Plan"] = summary["FY27_Vol_Plan"].round(1)
+        summary = summary.rename(columns={"FY27_Vol_Plan": "FY27 Vol Plan"})
+        total_vol = round(float(df["FY27 Avg"].sum()), 1)
+        table_str = summary.to_string(index=False)
+        pad = max(0, len(group_col) - 5)
+        total_row = f"TOTAL{' ' * pad}  {total_appts}       {total_vol}"
+        return {
+            "group_by": group_col,
+            "data": summary.to_dict(orient="records"),
+            "total_appointments": total_appts,
+            "total_fy27_volume": total_vol,
+            "formatted_table": f"{table_str}\n{total_row}",
+        }
+
+    counts = (
+        df.groupby(group_col)
+        .size()
+        .reset_index(name="Appointments")
         .sort_values("Appointments", ascending=False)
     )
-    summary["FY27_Vol_Plan"] = summary["FY27_Vol_Plan"].round(1)
-    summary = summary.rename(columns={"FY27_Vol_Plan": "FY27 Vol Plan"})
-
-    total_appts = int(len(df))
-    total_vol = round(float(df["FY27 Avg"].sum()), 1)
-
-    table_str = summary.to_string(index=False)
+    table_str = counts.to_string(index=False)
     pad = max(0, len(group_col) - 5)
-    total_row = f"TOTAL{' ' * pad}  {total_appts}       {total_vol}"
-
+    total_row = f"TOTAL{' ' * pad}  {total_appts}"
     return {
         "group_by": group_col,
-        "data": summary.to_dict(orient="records"),
+        "data": counts.to_dict(orient="records"),
         "total_appointments": total_appts,
-        "total_fy27_volume": total_vol,
         "formatted_table": f"{table_str}\n{total_row}",
     }
 
@@ -160,10 +173,9 @@ TOOLS: list[dict] = [
     {
         "name": "get_appointment_count",
         "description": (
-            "Count new channel partner appointments AND return FY27 volume plan by geography or channel type. "
-            "ALWAYS use this tool — never run_pandas — when the user asks how many dealers/appointments "
-            "are planned, or asks for appointment count alongside FY27 volume/plan data. "
-            "Returns both Appointments (row count) and FY27 Vol Plan (sum of FY27 Avg) per group."
+            "Count new channel partner appointments by geography or channel type. "
+            "ALWAYS use this tool — never run_pandas — when the user asks how many dealers/appointments are planned. "
+            "Set include_volume=true only when the user explicitly asks for FY27 volume plan alongside the count."
         ),
         "input_schema": {
             "type": "object",
@@ -176,6 +188,10 @@ TOOLS: list[dict] = [
                     "type": "string",
                     "enum": ["zone", "region", "state", "channel", "month"],
                     "description": "Group results by this dimension. Default: zone.",
+                },
+                "include_volume": {
+                    "type": "boolean",
+                    "description": "Set true only when user explicitly asks for FY27 volume plan alongside appointment count.",
                 },
             },
             "required": [],
