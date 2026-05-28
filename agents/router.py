@@ -7,11 +7,17 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import BaseModel
 
 load_dotenv(Path(__file__).parent / ".env")
+
+class _Intent(BaseModel):
+    label: Literal["district_coverage", "pcuv_mbo"]
+
 
 _CLASSIFY_SYSTEM = """You are a routing classifier for the RPG Enterprises GTM FY27 Slack bot.
 
@@ -20,9 +26,7 @@ Classify the user's question into exactly one category:
 - district_coverage: Questions about district-level coverage — DT counts, SD counts, DSE plans, feeder plans, DT appointment plans, coverage gaps, zone/region/district hierarchy, DT codes.
 - pcuv_mbo: Questions about PCUV new dealer appointments — SIS (Shop-in-Shop), CS (CEAT Shoppe), MBO (Multi-Brand Outlet), normal dealers, DL channel, appointment months, prospect names, PCUV sales potential/volume.
 
-For questions spanning both datasets, pick the primary domain. The routed agent will pull data from the other agent via its transfer tool if needed.
-
-Respond with ONLY one of: district_coverage, pcuv_mbo"""
+For questions spanning both datasets, pick the primary domain. The routed agent will pull data from the other agent via its transfer tool if needed."""
 
 
 def _classify(question: str, history: list | None, client: OpenAI) -> str:
@@ -34,13 +38,13 @@ def _classify(question: str, history: list | None, client: OpenAI) -> str:
                 messages.append({"role": m["role"], "content": m["content"]})
     messages.append({"role": "user", "content": question})
 
-    resp = client.chat.completions.create(
+    resp = client.beta.chat.completions.parse(
         model="gpt-5.4-mini",
         messages=messages,
-        max_completion_tokens=10,
+        response_format=_Intent,
     )
-    label = resp.choices[0].message.content.strip().lower()
-    return label if label in ("district_coverage", "pcuv_mbo") else "district_coverage"
+    parsed = resp.choices[0].message.parsed
+    return parsed.label if parsed else "district_coverage"
 
 
 def _clean_for_pcuv(history: list | None) -> list | None:
