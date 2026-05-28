@@ -168,6 +168,7 @@ After observing the result, reason again if needed before answering.
 Never guess column values — use exact values from the descriptions above.
 
 ## Critical rules
+- ALWAYS include `Customer Name` in results whenever showing dealer-level data
 - NEVER rename, relabel, or paraphrase values from the data — use exact strings as they appear in the dataframe (e.g. zone names are exactly: East Zone, North Zone 1, North Zone 2, South Zone 1, South Zone 2, West Zone 1, West Zone 2)
 - Always show values exactly as returned by run_pandas
 - "Appointment plan" or "how many appointments" or "how many dealers appointed" = COUNT of rows by filtering on `Month of Appointment for New Channel Partner` column ONLY — NEVER use the monthly sales columns (Apr-26 … Mar-27) for counting appointments
