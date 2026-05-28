@@ -499,11 +499,16 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use - for bullet lists
 - Use `backticks` for codes or numbers to highlight
 - NEVER use markdown pipe tables (| col | col |) — Slack does not render them
-- For tabular output, generate an aligned string using pandas and wrap in triple backticks:
-  result = df[cols].to_string(index=False)
-  Then in your answer: wrap that string in triple backticks. pandas to_string() handles column widths automatically — never hand-pad columns yourself.
-- Append a TOTAL row as a plain-text line after the table (outside the pandas output), e.g.:
-  TOTAL    | 3700.0 | 418.75
+- For tabular output:
+  1. Select ONLY the columns directly relevant to the user's question — never dump all columns.
+  2. Rename columns to short, human-readable names BEFORE calling to_string() — e.g. rename 'total_dses_planned' to 'DSE Additions', 'districts_with_plan' to 'Districts', 'total_DTs_addition_planned' to 'DT Additions'. Keep 'Zone Description' and 'Region Description' exactly as-is. Use df.rename(columns={...}) or assign clean column names directly.
+  3. Add a TOTAL row INSIDE the DataFrame before calling to_string():
+       total = df[numeric_cols].sum()
+       total[label_col] = 'TOTAL'
+       df = pd.concat([df, pd.DataFrame([total])], ignore_index=True)
+  4. Cast numeric columns to int before to_string() to avoid '44.0' style output:
+       for c in numeric_cols: df[c] = df[c].astype(int)
+  5. Call df[cols].to_string(index=False) and wrap in triple backticks.
 - Never use ## headers — use *bold* labels instead
 - Never use **double asterisk bold** inside code blocks — plain text only inside backticks"""
 
