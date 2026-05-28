@@ -1,39 +1,120 @@
 """
-Slack output formatter — adds a bold summary line and ⚠️ gap highlights.
-Applied as a lightweight post-processing step after the agent produces its answer.
+Slack output formatter — adds summary, gap highlights, and converts tables to Block Kit.
+Uses structured output (Pydantic + .parse) to extract table data reliably.
 """
-
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import BaseModel
 
 load_dotenv(Path(__file__).parent / ".env")
 
-_FORMAT_SYSTEM = """Format this GTM bot answer for Slack. Instructions:
-1. Add a one-line bold summary at the very top using SINGLE asterisks: *<key finding in ≤15 words>* — SKIP step 1 if the answer already starts with *bold text*
-2. Prefix any line that describes zero or missing coverage (0 DTs, no SDs, no appointment plans, zero FY27 plan) with ⚠️
-3. If the answer contains a markdown pipe table (lines starting with |), convert it into a triple-backtick code block with plain-text aligned columns — Slack does not render markdown tables. Remove any **bold** markers inside the table, use plain text only.
-4. If a table (in triple backticks) has no TOTAL row, add one summing all numeric columns.
-5. Keep all data values and numbers exactly as-is.
-6. ALWAYS use single asterisks for bold (*text*), never double asterisks (**text**).
-7. Do not rewrite, reorder, or truncate the body."""
+# ---------------------------------------------------------------------------
+# Structured output schema
+# ---------------------------------------------------------------------------
+
+class _TableData(BaseModel):
+    headers: list[str]
+    rows: list[list[str]]  # all cell values as strings, including TOTAL row
 
 
-def format_for_slack(answer: str) -> str:
-    """Post-process agent answer: add summary + gap highlights."""
+class _Parsed(BaseModel):
+    summary: str           # one-line key finding; empty string if answer already starts with *bold*
+    text: str              # formatted answer; table replaced with literal "[TABLE]" placeholder
+    table: Optional[_TableData] = None  # None if no tabular data present
+
+
+_SYSTEM = """You process GTM sales bot answers for Slack display. Return JSON with these fields:
+
+summary: One-line key finding (≤15 words). Return "" if the answer already starts with *bold text*.
+
+text: The full answer with these changes applied:
+  - Prefix any line describing zero or missing data (0 DTs, no SDs, no appointments, zero plan, NaN) with ⚠️
+  - Use single asterisks *bold* only — never **double asterisks**
+  - If a table exists (code block or pipe-separated), replace the entire table block with the single word [TABLE]
+  - Keep all other content exactly as-is
+
+table: If a table exists, extract {"headers": [...], "rows": [[...], ...]} with every cell value as a string.
+  Include the TOTAL/GRAND TOTAL row in rows. Return null if no table."""
+
+
+# ---------------------------------------------------------------------------
+# Block Kit builders
+# ---------------------------------------------------------------------------
+
+def _section(text: str) -> dict:
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+def _table_block(table: _TableData) -> dict:
+    header_row = [{"type": "raw_text", "text": h} for h in table.headers]
+    data_rows = [
+        [{"type": "raw_text", "text": str(cell)} for cell in row]
+        for row in table.rows
+    ]
+    return {"type": "table", "rows": [header_row] + data_rows}
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def format_for_slack(answer: str) -> tuple[str, list]:
+    """
+    Post-process agent answer for Slack.
+    Returns (fallback_text, blocks).
+    - fallback_text: plain mrkdwn string (used for push notifications and non-block clients)
+    - blocks: list of Slack Block Kit block dicts; empty list if no table present
+    """
     if len(answer) < 150:
-        return answer  # short answers don't need formatting
+        return answer, []
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    resp = client.chat.completions.create(
+
+    result = client.beta.chat.completions.parse(
         model="gpt-4.1-mini",
         messages=[
-            {"role": "system", "content": _FORMAT_SYSTEM},
+            {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": answer},
         ],
+        response_format=_Parsed,
     )
-    return resp.choices[0].message.content.strip()
+
+    parsed = result.choices[0].message.parsed
+    if parsed is None:
+        return answer, []
+
+    prefix = f"*{parsed.summary}*\n\n" if parsed.summary else ""
+
+    # --- Build fallback plain text ---
+    if parsed.table:
+        table_plaintext = "\n".join(
+            " | ".join(row) for row in [parsed.table.headers] + parsed.table.rows
+        )
+        fallback = prefix + parsed.text.replace("[TABLE]", table_plaintext)
+    else:
+        fallback = prefix + parsed.text
+
+    # --- Build Block Kit blocks ---
+    blocks: list[dict] = []
+
+    if parsed.table:
+        body = prefix + parsed.text
+        parts = body.split("[TABLE]")
+        before = parts[0].strip()
+        after = parts[1].strip() if len(parts) > 1 else ""
+
+        if before:
+            blocks.append(_section(before))
+        blocks.append(_table_block(parsed.table))
+        if after:
+            blocks.append(_section(after))
+    else:
+        blocks.append(_section(prefix + parsed.text))
+
+    return fallback, blocks

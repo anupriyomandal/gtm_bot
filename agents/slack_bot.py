@@ -71,24 +71,40 @@ def _process(text: str, user: str, channel: str, thread_ts: str, post_to_channel
     try:
         history = _get_history(channel)
         answer, new_history = run_routed_agent(text, history=history, verbose=False)
-        answer = format_for_slack(answer)
+        fallback_text, blocks = format_for_slack(answer)
         _set_history(channel, new_history)
     except Exception as exc:
-        answer = f"Sorry, something went wrong: {exc}"
+        fallback_text = f"Sorry, something went wrong: {exc}"
+        blocks = []
 
     if post_to_channel:
-        # Post in the main channel, tagging the user who asked
-        client.chat_postMessage(
-            channel=channel,
-            text=f"<@{user}> {answer}",
-        )
+        mention = f"<@{user}>"
+        if blocks:
+            mention_block = {"type": "section", "text": {"type": "mrkdwn", "text": mention}}
+            client.chat_postMessage(
+                channel=channel,
+                text=f"{mention} {fallback_text}",
+                blocks=[mention_block] + blocks,
+            )
+        else:
+            client.chat_postMessage(
+                channel=channel,
+                text=f"{mention} {fallback_text}",
+            )
     else:
-        # Default: reply in thread
-        client.chat_postMessage(
-            channel=channel,
-            thread_ts=thread_ts,
-            text=answer,
-        )
+        if blocks:
+            client.chat_postMessage(
+                channel=channel,
+                thread_ts=thread_ts,
+                text=fallback_text,
+                blocks=blocks,
+            )
+        else:
+            client.chat_postMessage(
+                channel=channel,
+                thread_ts=thread_ts,
+                text=fallback_text,
+            )
 
     try:
         client.reactions_remove(channel=channel, timestamp=thread_ts, name="thinking_face")
