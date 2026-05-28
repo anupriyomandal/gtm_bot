@@ -90,12 +90,14 @@ def format_for_slack(answer: str) -> tuple[str, list]:
     if parsed is None:
         return answer, []
 
+    # Force single-asterisk Slack bold — GPT often ignores the instruction
+    parsed.text = re.sub(r"\*\*(.+?)\*\*", r"*\1*", parsed.text)
+    parsed.summary = re.sub(r"\*\*(.+?)\*\*", r"*\1*", parsed.summary)
+
     # Safety net: if GPT extracted a table but forgot to put [TABLE] in text,
     # strip code blocks from text programmatically rather than showing both.
     if parsed.table and "[TABLE]" not in parsed.text:
         parsed.text = re.sub(r"```[\s\S]*?```", "[TABLE]", parsed.text)
-        # If still no [TABLE] (table was plain text, not code block), clear the text body
-        # and let the table block carry the content
         if "[TABLE]" not in parsed.text:
             parsed.text = parsed.text  # leave as-is; table block appends below
 
