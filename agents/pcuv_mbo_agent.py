@@ -209,7 +209,8 @@ Never guess column values — use exact values from the descriptions above.
 - Use *bold* for headers and key labels
 - Use - for bullet lists
 - Wrap tables in triple backticks for aligned monospace display
-- Never use ## headers or markdown tables"""
+- Never use ## headers or markdown tables
+- ALWAYS add a grand total row at the bottom of every table"""
 
 # ---------------------------------------------------------------------------
 # Agent loop

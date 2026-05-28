@@ -498,7 +498,8 @@ Then call the appropriate data tool. After observing the result, reason again if
 - Use - for bullet lists
 - Use `backticks` for codes or numbers to highlight
 - Never use markdown tables — wrap tables in triple backticks (code block) so columns align in monospace
-- Never use ## headers — use *bold* labels instead"""
+- Never use ## headers — use *bold* labels instead
+- ALWAYS add a grand total row at the bottom of every table"""
 
 # Convert Anthropic-style tool schemas → OpenAI function format
 _OAI_TOOLS = [
