@@ -1,1 +1,1 @@
-web: gunicorn --workers 2 --threads 4 --bind 0.0.0.0:$PORT --pythonpath . agents.slack_bot:flask_app
+web: gunicorn --workers 1 --threads 8 --bind 0.0.0.0:$PORT --pythonpath . agents.slack_bot:flask_app
