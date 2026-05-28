@@ -41,7 +41,8 @@ text: The full answer with these changes applied:
   - Keep all non-table content exactly as-is
 
 table: If a table exists, extract {"headers": [...], "rows": [[...], ...]} with every cell value as a string.
-  Include the TOTAL/GRAND TOTAL row in rows. Return null if no table."""
+  CRITICAL: You MUST include the TOTAL or GRAND TOTAL row as the last entry in rows if it appears in the original answer. Do not skip it.
+  Return null if no table."""
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +105,10 @@ def format_for_slack(answer: str) -> tuple[str, list]:
     # Force single-asterisk Slack bold — GPT often ignores the instruction
     parsed.text = re.sub(r"\*\*(.+?)\*\*", r"*\1*", parsed.text)
     parsed.summary = re.sub(r"\*\*(.+?)\*\*", r"*\1*", parsed.summary)
+
+    # Strip trailing .0 from whole-number floats in prose text (e.g. "32.0 DTs" → "32 DTs")
+    parsed.text = re.sub(r"\b(\d+)\.0\b", r"\1", parsed.text)
+    parsed.summary = re.sub(r"\b(\d+)\.0\b", r"\1", parsed.summary)
 
     # Safety net: if GPT extracted a table but forgot to put [TABLE] in text,
     # strip code blocks from text programmatically rather than showing both.
